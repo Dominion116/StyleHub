@@ -103,7 +103,9 @@ function ListProductDialog() {
   const [category, setCategory] = useState('0')
   const [price, setPrice] = useState('')
   const [stock, setStock] = useState('')
-  const [imageURI, setImageURI] = useState('')
+  const [imageFile, setImageFile] = useState<File | null>(null)
+  const [imagePreview, setImagePreview] = useState('')
+  const [uploading, setUploading] = useState(false)
 
   const { listProduct, isPending, isConfirming, isSuccess, error } = useListProduct()
   const { toast } = useToast()
@@ -135,10 +137,39 @@ function ListProductDialog() {
     setCategory('0')
     setPrice('')
     setStock('')
-    setImageURI('')
+    setImageFile(null)
+    setImagePreview('')
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      if (!file.type.startsWith('image/')) {
+        toast({
+          title: 'Error',
+          description: 'Please select an image file',
+          variant: 'destructive',
+        })
+        return
+      }
+      if (file.size > 10 * 1024 * 1024) { // 10MB limit
+        toast({
+          title: 'Error',
+          description: 'Image size must be less than 10MB',
+          variant: 'destructive',
+        })
+        return
+      }
+      setImageFile(file)
+      const reader = new FileReader()
+      reader.onloadend = () => {
+        setImagePreview(reader.result as string)
+      }
+      reader.readAsDataURL(file)
+    }
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!name || !price || !stock) {
       toast({
@@ -147,6 +178,29 @@ function ListProductDialog() {
         variant: 'destructive',
       })
       return
+    }
+
+    let imageURI = ''
+    
+    if (imageFile) {
+      setUploading(true)
+      try {
+        const { uploadImageToIPFS } = await import('@/lib/pinata')
+        imageURI = await uploadImageToIPFS(imageFile)
+        toast({
+          title: 'Image Uploaded',
+          description: 'Image uploaded to IPFS successfully',
+        })
+      } catch (err) {
+        toast({
+          title: 'Upload Failed',
+          description: 'Failed to upload image to IPFS. Please try again.',
+          variant: 'destructive',
+        })
+        setUploading(false)
+        return
+      }
+      setUploading(false)
     }
 
     const priceInWei = viemParseEther(price)
@@ -237,17 +291,30 @@ function ListProductDialog() {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="image">Image URL</Label>
+            <Label htmlFor="image">Product Image</Label>
             <Input
               id="image"
-              value={imageURI}
-              onChange={(e) => setImageURI(e.target.value)}
-              placeholder="https://..."
+              type="file"
+              accept="image/*"
+              onChange={handleImageChange}
+              className="cursor-pointer"
             />
+            {imagePreview && (
+              <div className="mt-2 relative w-full h-40 bg-muted rounded-lg overflow-hidden">
+                <img
+                  src={imagePreview}
+                  alt="Preview"
+                  className="object-cover w-full h-full"
+                />
+              </div>
+            )}
+            <p className="text-xs text-muted-foreground">
+              Maximum file size: 10MB. Supported formats: JPG, PNG, GIF, WebP
+            </p>
           </div>
 
-          <Button type="submit" className="w-full" disabled={isPending || isConfirming}>
-            {isPending || isConfirming ? 'Listing...' : 'List Product'}
+          <Button type="submit" className="w-full" disabled={isPending || isConfirming || uploading}>
+            {uploading ? 'Uploading Image...' : isPending || isConfirming ? 'Listing...' : 'List Product'}
           </Button>
         </form>
       </DialogContent>

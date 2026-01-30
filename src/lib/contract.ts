@@ -280,7 +280,7 @@ export const STYLEHUB_ABI = [
 ] as const
 
 // Replace with your deployed contract address on Base mainnet
-export const STYLEHUB_ADDRESS = "0x0000000000000000000000000000000000000000" as `0x${string}`
+export const STYLEHUB_ADDRESS = "0xDbf0f29d17d0Ea65ec1fc0B19D1Ef45c6C788396" as `0x${string}`
 
 export const CATEGORIES = [
   { value: 0, label: "Tops" },
